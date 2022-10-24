@@ -1,0 +1,1 @@
+In this project I will attempt to mimic pintrests data pipeline that they use to process billions of datapoints on a daily basis. This project will be done with the help of AIcore.
