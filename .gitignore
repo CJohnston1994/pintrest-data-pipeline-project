@@ -3,3 +3,6 @@
 *.ipynb
 __init__.py
 tests/*
+s3_name.txt
+*.yaml
+*.env
