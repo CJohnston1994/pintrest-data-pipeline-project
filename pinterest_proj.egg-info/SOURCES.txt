@@ -1,0 +1,14 @@
+README.md
+setup.py
+pinterest-proj/__init__.py
+pinterest-proj/__main__.py
+pinterest-proj/aws.py
+pinterest-proj/config.py
+pinterest-proj/main.py
+pinterest-proj/API/__init__.py
+pinterest-proj/API/project_pin_API.py
+pinterest-proj/API/user_posting_emulation.py
+pinterest_proj.egg-info/PKG-INFO
+pinterest_proj.egg-info/SOURCES.txt
+pinterest_proj.egg-info/dependency_links.txt
+pinterest_proj.egg-info/top_level.txt

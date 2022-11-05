@@ -1,5 +1,5 @@
 import unittest
-import config as c
+from (pintrest-proj) import config as c
 
 class AccessKey(object):
     def __init__(self, user, region):
