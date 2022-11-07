@@ -6,3 +6,5 @@ tests/*
 s3_name.txt
 *.yaml
 *.env
+*/tests/*
+pinterest_proj.egg-info/*

@@ -1,5 +1,7 @@
 from kafka import KafkaConsumer
-import json, boto3
+from datetime import datetime
+import pinterest_proj.config as c
+import json, boto3, os
 
 batch_consumer = KafkaConsumer(
     "PintrestData",
@@ -7,4 +9,11 @@ batch_consumer = KafkaConsumer(
     value_deserializer=lambda  x: json.loads(x.decode("utf-8"))  
 )
 
-s3_session = boto3.session(aws_access_key_id=c.S3_ACCESS,aws_secret_access_key =c.S3_SECRET)
+s3_resource = boto3.resource('s3')
+date = datetime.now().strftime("%Y-%m-%d").split('-')
+
+for message in batch_consumer:
+    unique_id = message.value['unique_id'].replace('-', '_')
+    path = os.path.join('raw_data', f'year={date[0]}', f'month={date[1]}', f'day={date[2]}', f'{unique_id}.json')
+    s3_resource.Bucket(c.BUCKET_NAME).put_object(Body=json.dumps(message.value), Key=path)
+    break
