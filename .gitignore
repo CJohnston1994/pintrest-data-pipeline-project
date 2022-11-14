@@ -8,3 +8,4 @@ s3_name.txt
 *.env
 */tests/*
 pinterest_proj.egg-info/*
+data.txt
