@@ -1,6 +1,7 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import regexp_replace, col
+from pyspark.sql.functions import regexp_replace, when, lit, col
 from pyspark import SparkContext, SparkConf
+from datetime import datetime, timedelta
 import os, boto3, pyspark
 import config as c
 
@@ -25,27 +26,45 @@ hadoopConf.set('spark.hadoop.fs.s3a.aws.credentials.provider', 'org.apache.hadoo
 # Create our Spark session
 spark=SparkSession(sc)
 
+# set to run the script for the current day/ yesterday
+#date = datetime.now().strftime("%Y-%m-%d").split('-')
+#yest = (datetime.now() - timedelta(days = 1)).strftime("%Y-%m-%d").split('-')
+# df = spark.read.json(f"s3a://pinterest-data-0759ba42-ccf0-4396-9b86-76de3b8e6640/raw_data/year={date[0]}/month={date[1]}/day={date[2]}/*.json")
+
+
 # Read from the S3 bucket
 df = spark.read.json("s3a://pinterest-data-0759ba42-ccf0-4396-9b86-76de3b8e6640/raw_data/year=2022/month=11/day=14/*.json") # You may want to change this to read csv depending on the files your reading from the bucket
 
+# Schema = ('category', 'description', 'downloaded', 'follower_count', 'image_src', 'index', 'is_image_or_video', 'save_location', 'tag_list', 'title', 'unique_id')
 '''
 Cleaning Data
 Convert k and M in follower count to 0's
 TODO - Title, Description, poster name, tag_list, img_src
 '''
+def null_if_not_match(column, value):
+    return when(column != value, column).otherwise(lit(None))
 
-df = df.withColumn("follower_count", regexp_replace(col("follower_count"), "k", "000")) \
+to_null =  {"title" : "No Title Data Available",
+            "description":"No description available Story format",
+            "follower_count" : "User Info Error",
+            "tag_list" : "N,o, ,T,a,g,s, ,A,v,a,i,l,a,b,l,e",
+            "image_src" : "Image src error"
+            }
+
+'''
+names = df.schema.names
+for name in names:
+    print(name + ": " + df.where(df[name].isNull()).count())
+'''
+df.withColumn("follower_count", regexp_replace(col("follower_count"), "k", "000")) \
     .withColumn("follower_count", regexp_replace(col("follower_count"), "M", "000000")) \
     .withColumn("follower_count", col("follower_count").cast("int")) \
+    .withColumn("title", null_if_not_match(col("title"), to_null["title"])) \
+    .withColumn("description", null_if_not_match(col("description"), to_null["description"])) \
+    .withColumn("follower_count", null_if_not_match(col("follower_count"), to_null["follower_count"])) \
+    .withColumn("tag_list", null_if_not_match(col("tag_list"), to_null["tag_list"])) \
+    .withColumn("image_src", null_if_not_match(col("image_src"), to_null["image_src"])) \
+    .dropDuplicates() \
+    .dropDuplicates(subset=["title", "description", "tag_list", "image_src"]) \
+    .dropna(thresh=2, subset=["title", "description", "tag_list"]) \
     .show()
-    
-
-'''
-correct = .withColumn('follower_count', regexp_replace(col('follower_count'), 'k', '000')) 
-tried:
-df.follower_count
-col("follower_count")
-$"follower_count"
-df["follower_count"]
-
-'''

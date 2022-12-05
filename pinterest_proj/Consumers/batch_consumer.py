@@ -13,9 +13,7 @@ batch_consumer = KafkaConsumer(
 s3_resource = boto3.resource('s3')
 date = datetime.now().strftime("%Y-%m-%d").split('-')
 
-for index, message in enumerate(batch_consumer):
+for message in batch_consumer:
     unique_id = message.value['unique_id'].replace('-', '_')
     path = os.path.join('raw_data', f'year={date[0]}', f'month={date[1]}', f'day={date[2]}', f'{unique_id}.json')
     s3_resource.Bucket(c.BUCKET_NAME).put_object(Body=json.dumps(message.value), Key=path)
-    if index >= 100:
-        break
