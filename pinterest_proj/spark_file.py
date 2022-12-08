@@ -13,7 +13,6 @@ conf = SparkConf() \
     .setMaster("local[*]") \
     .setAppName('Pinterest_spark_app') \
 
-
 sc=SparkContext(conf=conf)
 
 # Configure the setting to read from the S3 bucket
@@ -25,12 +24,6 @@ hadoopConf.set('spark.hadoop.fs.s3a.aws.credentials.provider', 'org.apache.hadoo
 
 # Create our Spark session
 spark=SparkSession(sc)
-
-# set to run the script for the current day/ yesterday
-#date = datetime.now().strftime("%Y-%m-%d").split('-')
-#yest = (datetime.now() - timedelta(days = 1)).strftime("%Y-%m-%d").split('-')
-# df = spark.read.json(f"s3a://pinterest-data-0759ba42-ccf0-4396-9b86-76de3b8e6640/raw_data/year={date[0]}/month={date[1]}/day={date[2]}/*.json")
-
 
 # Read from the S3 bucket
 df = spark.read.json("s3a://pinterest-data-0759ba42-ccf0-4396-9b86-76de3b8e6640/raw_data/year=2022/month=11/day=14/*.json") # You may want to change this to read csv depending on the files your reading from the bucket
@@ -51,20 +44,15 @@ to_null =  {"title" : "No Title Data Available",
             "image_src" : "Image src error"
             }
 
-'''
-names = df.schema.names
-for name in names:
-    print(name + ": " + df.where(df[name].isNull()).count())
-'''
-df.withColumn("follower_count", regexp_replace(col("follower_count"), "k", "000")) \
-    .withColumn("follower_count", regexp_replace(col("follower_count"), "M", "000000")) \
-    .withColumn("follower_count", col("follower_count").cast("int")) \
-    .withColumn("title", null_if_not_match(col("title"), to_null["title"])) \
-    .withColumn("description", null_if_not_match(col("description"), to_null["description"])) \
-    .withColumn("follower_count", null_if_not_match(col("follower_count"), to_null["follower_count"])) \
-    .withColumn("tag_list", null_if_not_match(col("tag_list"), to_null["tag_list"])) \
-    .withColumn("image_src", null_if_not_match(col("image_src"), to_null["image_src"])) \
-    .dropDuplicates() \
-    .dropDuplicates(subset=["title", "description", "tag_list", "image_src"]) \
-    .dropna(thresh=2, subset=["title", "description", "tag_list"]) \
-    .show()
+df.dropDuplicates(subset=["title", "description", "tag_list", "image_src"]) \
+  .dropna(thresh=2, subset=["title", "description", "tag_list"]) \
+  .drop(col("downloaded"), col("save_location")) \
+  .withColumn("follower_count", regexp_replace(col("follower_count"), "k", "000")) \
+  .withColumn("follower_count", regexp_replace(col("follower_count"), "M", "000000")) \
+  .withColumn("follower_count", col("follower_count").cast("int")) \
+  .withColumn("title", null_if_not_match(col("title"), to_null["title"])) \
+  .withColumn("description", null_if_not_match(col("description"), to_null["description"])) \
+  .withColumn("follower_count", null_if_not_match(col("follower_count"), to_null["follower_count"])) \
+  .withColumn("tag_list", null_if_not_match(col("tag_list"), to_null["tag_list"])) \
+  .withColumn("image_src", null_if_not_match(col("image_src"), to_null["image_src"])) \
+  .show()
