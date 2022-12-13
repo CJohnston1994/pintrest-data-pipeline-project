@@ -28,15 +28,34 @@ class Spark_batch_controller():
         # Create our Spark session
         self.spark=SparkSession(sc)
 
-    def null_if_not_match(self, value):
-        return when(self != value, self).otherwise(lit(None))
+    def null_if_not_match(self, value:str, comparison:str):
+        '''
+        Trys to match a value to a comparison
+        if the value does not match the comparison it is returned
+        if the value matches the comparison the return will be None type
+        '''
+        return when(value != comparison, value).otherwise(lit(None))
 
-    def read_from_s3(self, date = (datetime.now()-timedelta(days = 1))):
+    def read_from_s3(self, date =(datetime.now()-timedelta(days = 1))):
+        '''
+        Function atakes in a date time and scrapes the data from that day,
+        if no date is given it takes the current date and scrapes the previous day
+        The path a constant taken from the env file and the date given is used to complete the S3 cluster path
+        '''
         # Read from the S3 bucket
-        bucket_path = "s3a://pinterest-data-0759ba42-ccf0-4396-9b86-76de3b8e6640/raw_data"
-        return self.spark.read.json(f"{bucket_path}/year={date.year}/month={date.month}/day={str(date.day).zfill(2)}/*.json")       
+        
+        return self.spark.read.json(f"{c.BUCKET_PATH}/year={date.year}/month={date.month}/day={str(date.day).zfill(2)}/*.json")       
 
-    def clean_data(self, df:DataFrame ):
+    def clean_data(self, df:DataFrame):
+        '''
+        firstly a dict of values per row that need to be cleaned is set,
+        the duplicates and NA values are dropped from the selected data
+        follower_count suffix repleced with relevant number of 0's
+        the dict is userd to clean the other balues
+        '''
+        original_order = "unique_id", "title", "description", "follower_count", "tag_list", "is_image_or_video", "image_src", "downloaded", "save_location", "category"
+        print(df.schema)
+
         to_null =  {"title" : "No Title Data Available",
                     "description":"No description available Story format",
                     "follower_count" : "User Info Error",
@@ -45,27 +64,28 @@ class Spark_batch_controller():
                     }
 
         #drop na and duplicate rows
-        df = df.dropDuplicates(subset=["title", "description", "tag_list", "image_src"]) \
+        df = df.dropDuplicates(subset=["unique_id", "title", "description", "tag_list"]) \
             .dropna(thresh=2, subset=["title", "description", "tag_list"])
 
         #convert follower count from suffixed string to integer
         df= df.withColumn("follower_count", regexp_replace("follower_count", "k", "000")) \
-                  .withColumn("follower_count", regexp_replace("follower_count", "M", "000000")) \
-                  .withColumn("follower_count", regexp_replace("follower_count", "B", "000000000"))
+              .withColumn("follower_count", regexp_replace("follower_count", "M", "000000")) \
+              .withColumn("follower_count", regexp_replace("follower_count", "B", "000000000"))
         # Replace all values in df that match the to_null dict values
 
         for key, value in to_null.items():
             df = df.withColumn(key, self.null_if_not_match(col(key), value))
-        '''     
-        df = df.withColumn("title", self.null_if_not_match(col("title"), to_null["title"]))
-        df = df.withColumn("description", self.null_if_not_match(col("description"), to_null["description"])) \
-        df = df.withColumn("follower_count", self.null_if_not_match(col("follower_count"), to_null["follower_count"])) \
-        df = df.withColumn("tag_list", self.null_if_not_match(col("tag_list"), to_null["tag_list"])) \
-        df = df.withColumn("image_src", self.null_if_not_match(col("image_src"), to_null["image_src"])) \
-        '''
+
+        #clean save locations string    
         df = df.withColumn("save_location", regexp_replace(col("save_location"), "Local save in", ""))
 
+        #cast ffollower type to int
         df = df.withColumn("follower_count", df["follower_count"].cast(types.IntegerType()))
+
+        #cast downloaded to bool
+        df = df.withColumn("downloaded", df["downloaded"].cast(types.BooleanType()))
+
+        df = df.select("unique_id", "title", "description", "follower_count", "tag_list", "is_image_or_video", "image_src", "downloaded", "save_location", "category")
 
         return df
 
@@ -74,13 +94,3 @@ if __name__ == "__main__":
     df = sbc.read_from_s3(datetime(2022,11,7))
     clean_df = sbc.clean_data(df)
     clean_df.show()
-
-
-'''
-!!! - Before interview Go back to notebooks for theory
-
-Schema = ('category', 'description', 'downloaded', 'follower_count', 'image_src', 'index', 'is_image_or_video', 'save_location', 'tag_list', 'title', 'unique_id')
-Cleaning Data
-Convert k and M in follower count to 0's
-TODO - Title, Description, poster name, tag_list, img_src
-'''
