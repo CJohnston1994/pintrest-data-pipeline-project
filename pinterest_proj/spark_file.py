@@ -2,12 +2,12 @@ from pyspark.sql import SparkSession, types, DataFrame
 from pyspark.sql.functions import regexp_replace, when, lit, col
 from pyspark import SparkContext, SparkConf
 from datetime import datetime, timedelta
-import os, boto3, pyspark
+import os
 import config as c
 
 
 class Spark_batch_controller():
-    def __init__(self, yesterday = True):
+    def __init__(self):
         # Adding the packages required to get data from S3  
         os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages com.amazonaws:aws-java-sdk-s3:1.12.196,org.apache.hadoop:hadoop-aws:3.3.1 pyspark-shell"
 
@@ -53,7 +53,6 @@ class Spark_batch_controller():
         follower_count suffix repleced with relevant number of 0's
         the dict is userd to clean the other balues
         '''
-        original_order = "unique_id", "title", "description", "follower_count", "tag_list", "is_image_or_video", "image_src", "downloaded", "save_location", "category"
         print(df.schema)
 
         to_null =  {"title" : "No Title Data Available",
@@ -85,12 +84,26 @@ class Spark_batch_controller():
         #cast downloaded to bool
         df = df.withColumn("downloaded", df["downloaded"].cast(types.BooleanType()))
 
-        df = df.select("unique_id", "title", "description", "follower_count", "tag_list", "is_image_or_video", "image_src", "downloaded", "save_location", "category")
+        df = df.select(["unique_id",
+                        "title",
+                        "description",
+                        "follower_count",
+                        "tag_list",
+                        "is_image_or_video",
+                        "image_src",
+                        "downloaded",
+                        "save_location",
+                        "category"])
+        df.show()
 
         return df
 
+    def run_batch_cleaner(self):
+        df = sbc.read_from_s3(datetime(2022, 11, 7))
+
+        return sbc.clean_data(df)
+
+
 if __name__ == "__main__":
     sbc = Spark_batch_controller()
-    df = sbc.read_from_s3(datetime(2022,11,7))
-    clean_df = sbc.clean_data(df)
-    clean_df.show()
+    clean_df = sbc.run_batch_cleaner()

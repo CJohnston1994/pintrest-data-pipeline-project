@@ -9,3 +9,5 @@ s3_name.txt
 */tests/*
 pinterest_proj.egg-info/*
 data.txt
+dist/*
+build/*
