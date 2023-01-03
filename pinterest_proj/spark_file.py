@@ -6,7 +6,7 @@ import os
 import config as c
 
 
-class Spark_batch_controller():
+class SparkBatchController():
     def __init__(self):
         # Adding the packages required to get data from S3  
         os.environ["PYSPARK_SUBMIT_ARGS"] = "--packages com.amazonaws:aws-java-sdk-s3:1.12.196,org.apache.hadoop:hadoop-aws:3.3.1 pyspark-shell"
@@ -99,11 +99,16 @@ class Spark_batch_controller():
         return df
 
     def run_batch_cleaner(self):
-        df = sbc.read_from_s3(datetime(2022, 11, 7))
 
-        return sbc.clean_data(df)
+        '''
+        Run clean files from the s3 bucket and return them
+        '''
+        
+        df = self.read_from_s3(datetime(2022, 11, 7))
+
+        return self.clean_data(df)
 
 
 if __name__ == "__main__":
-    sbc = Spark_batch_controller()
+    sbc = SparkBatchController()
     clean_df = sbc.run_batch_cleaner()
