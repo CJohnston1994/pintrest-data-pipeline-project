@@ -16,14 +16,14 @@ with DAG(
     catchup=False
     ) as dag:
 
-    def task1():
-        import spark_file
-        batch_processor = Spark_batch_controller()
+    def clean_data():
+        from spark_file import SparkBatchController 
+        batch_processor = SparkBatchController()
         batch_processor.run_batch_cleaner()
         
     #task1
     batch_process = PythonOperator(
         task_id='batch_process_task',
-        python_callable=task1,
+        python_callable=clean_data(),
         dag = dag
     )
