@@ -30,9 +30,9 @@ class SparkBatchController():
 
     def null_if_not_match(self, value:str, comparison:str):
         '''
-        Trys to match a value to a comparison
-        if the value does not match the comparison it is returned
-        if the value matches the comparison the return will be None type
+        compares two strings, value and comparison
+        if value does not match comparison, value is returned
+        if value matches comparison the return will be None type
         '''
         return when(value != comparison, value).otherwise(lit(None))
 
@@ -53,7 +53,6 @@ class SparkBatchController():
         follower_count suffix repleced with relevant number of 0's
         the dict is userd to clean the other balues
         '''
-        print(df.schema)
 
         to_null =  {"title" : "No Title Data Available",
                     "description":"No description available Story format",
@@ -70,16 +69,17 @@ class SparkBatchController():
         df= df.withColumn("follower_count", regexp_replace("follower_count", "k", "000")) \
               .withColumn("follower_count", regexp_replace("follower_count", "M", "000000")) \
               .withColumn("follower_count", regexp_replace("follower_count", "B", "000000000"))
-        # Replace all values in df that match the to_null dict values
 
+        #cast follower type to int
+        df = df.withColumn("follower_count", df["follower_count"].cast(types.IntegerType()))
+
+        # Replace all values in df that match the to_null dict values
         for key, value in to_null.items():
             df = df.withColumn(key, self.null_if_not_match(col(key), value))
 
         #clean save locations string    
         df = df.withColumn("save_location", regexp_replace(col("save_location"), "Local save in", ""))
 
-        #cast ffollower type to int
-        df = df.withColumn("follower_count", df["follower_count"].cast(types.IntegerType()))
 
         #cast downloaded to bool
         df = df.withColumn("downloaded", df["downloaded"].cast(types.BooleanType()))
@@ -104,7 +104,7 @@ class SparkBatchController():
         Run clean files from the s3 bucket and return them
         '''
         
-        df = self.read_from_s3(datetime(2022, 11, 7))
+        df = self.read_from_s3()
 
         return self.clean_data(df)
 
