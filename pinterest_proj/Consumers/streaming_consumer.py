@@ -120,10 +120,3 @@ def foreach_batch_function(df, epoch_id):
 
 stream_df.writeStream.foreachBatch(foreach_batch_function) \
          .start().awaitTermination()
-
-'''# Stream output
-query = stream_df.writeStream \
-        .format("console") \
-        .outputMode("append") \
-        .start() \
-        .awaitTermination()'''
