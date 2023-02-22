@@ -24,7 +24,7 @@ with DAG(
     ) as dag:
 
         def task1():
-            from pinterest_proj.batch_processing import SparkBatchController 
+            from pinterest_proj.Consumers.batch_processing import SparkBatchController 
             batch_processor = SparkBatchController()
             batch_processor.run_batch_cleaner()
             
