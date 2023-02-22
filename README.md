@@ -5,8 +5,4 @@ In this project I will attempt to mimic pintrests data pipeline that they use to
 - Apach Kafka
 - Apach Spark
 - Apache Airflow
-- Apache  HBASE
-- Presto
 - Spark Streaming
-- Prometheus
-- Grafana

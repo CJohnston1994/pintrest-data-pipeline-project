@@ -11,7 +11,7 @@ using the spark structured streaming functionality.
 '''
 
 # setup packages if neededd 
-os.environ["PYSPARK_SUBMIT_ARGS"] = '--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1 pyspark-shell'
+os.environ["PYSPARK_SUBMIT_ARGS"] = '--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1,org.postgresql:postgresql:42.2.10 pyspark-shell'
 
 #kafka variables
 kafka_topic = "PintrestData"
@@ -81,15 +81,18 @@ stream_df = stream_df.withColumn("follower_count", regexp_replace("follower_coun
                      .withColumn("follower_count", regexp_replace("follower_count", "M", "000000")) \
                      .withColumn("follower_count", regexp_replace("follower_count", "B", "000000000")) 
 
-#cast follower type to int
-stream_df = stream_df.withColumn("follower_count", stream_df["follower_count"].cast(types.IntegerType()))
-
 # Replace all values in df that match the to_null dict values
 for key, value in to_null.items():
     stream_df = stream_df.withColumn(key, null_if_not_match(col(key), value))
 
-#clean save locations string    
-stream_df = stream_df.withColumn("save_location", regexp_replace(col("save_location"), "Local save in", ""))
+#cast follower type to int
+stream_df = stream_df.withColumn("follower_count", stream_df["follower_count"].cast(types.IntegerType()))
+
+
+#clean save location and is_image_or_video strings    
+stream_df = stream_df.withColumn("save_location", regexp_replace(col("save_location"), "Local save in ", ""))
+stream_df = stream_df.withColumn("is_image_or_video", regexp_replace(col("is_image_or_video"), "(story page format)", ""))
+
 
 #cast downloaded to bool
 stream_df = stream_df.withColumn("downloaded", stream_df["downloaded"].cast(types.BooleanType()))
@@ -105,9 +108,15 @@ stream_df = stream_df.select(["unique_id",
                               "save_location",
                               "category"])
 
-# Stream output
-query = stream_df.writeStream \
-        .format("console") \
-        .outputMode("update") \
-        .start() \
-        .awaitTermination()
+def foreach_batch_function(df, epoch_id):
+        df.write.mode("append") \
+         .format("jdbc") \
+         .option("url", "jdbc:postgresql://localhost:5432/pinterest_streaming") \
+         .option("driver", "org.postgresql.Driver") \
+         .option("dbtable", "experimental_data") \
+         .option("user", "postgres") \
+         .option("password", "123") \
+         .save()
+
+stream_df.writeStream.foreachBatch(foreach_batch_function) \
+         .start().awaitTermination()
