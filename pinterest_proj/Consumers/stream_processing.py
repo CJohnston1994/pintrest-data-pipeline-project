@@ -1,7 +1,5 @@
 from pyspark.sql import SparkSession, types
-import pyspark.sql.functions as PysparkSQLFunctions
-from pyspark.sql.functions import regexp_replace
-from pyspark.sql.functions import col
+from pyspark.sql.functions import *
 from pyspark.sql.types import StructField, StructType, StringType, IntegerType 
 import os
 
@@ -35,13 +33,11 @@ stream_df = spark \
             .option("startingOffsets", "earliest") \
             .load()
 
-def null_if_not_match(value:str, comparison:str):
+def null_if_match(value:str, comparison:str):
         '''
-        compares two strings, value and comparison
-        if value does not match comparison, value is returned
-        if value matches comparison the return will be None type
+        compares two strings and returns a None value if they match
         '''
-        return PysparkSQLFunctions.when(value != comparison, value).otherwise(PysparkSQLFunctions.lit(None))
+        return value if value != comparison else None
 
 # Define the Schema to convert kafka data to a JSON object
 jsonSchema = StructType([StructField("index", IntegerType()),
@@ -64,38 +60,31 @@ to_null =  {"title" : "No Title Data Available",
             "image_src" : "Image src error."}
 
 #cast kafka stream to string
-stream_df = stream_df.selectExpr("CAST(value as STRING)")
+stream_df = stream_df.selectExpr("CAST(value as STRING)") \
 
 # Apply schema to stream data
-stream_df = stream_df.withColumn("value", PysparkSQLFunctions \
-            .from_json(stream_df["value"], jsonSchema)) \
+stream_df = stream_df.withColumn("value", from_json(stream_df["value"], jsonSchema)) \
             .select(col("value.*"))
+
+#use to_null dict to change dirty data to None type
+stream_df = [stream_df.withColumn(key, null_if_match(col(key), value))for key, value in to_null.items()]
 
 # Stream Cleaning
 # Drop duplicates and NA values
-stream_df = stream_df.dropDuplicates(subset=["unique_id", "title", "description", "tag_list"]) \
-                     .dropna(thresh=2, subset=["title", "description", "tag_list"])
-
 # Clean follower count
-stream_df = stream_df.withColumn("follower_count", regexp_replace("follower_count", "k", "000")) \
-                     .withColumn("follower_count", regexp_replace("follower_count", "M", "000000")) \
-                     .withColumn("follower_count", regexp_replace("follower_count", "B", "000000000")) 
-
 # Replace all values in df that match the to_null dict values
-for key, value in to_null.items():
-    stream_df = stream_df.withColumn(key, null_if_not_match(col(key), value))
-
-#cast follower type to int
-stream_df = stream_df.withColumn("follower_count", stream_df["follower_count"].cast(types.IntegerType()))
-
-
-#clean save location and is_image_or_video strings    
-stream_df = stream_df.withColumn("save_location", regexp_replace(col("save_location"), "Local save in ", ""))
-stream_df = stream_df.withColumn("is_image_or_video", regexp_replace(col("is_image_or_video"), "(story page format)", ""))
-
-
-#cast downloaded to bool
-stream_df = stream_df.withColumn("downloaded", stream_df["downloaded"].cast(types.BooleanType()))
+# Cast follower type to int
+# Clean save location and is_image_or_video strings    
+# Cast downloaded to bool
+stream_df = stream_df.dropDuplicates(subset=["unique_id", "title", "description", "tag_list"]) \
+                     .dropna(thresh=2, subset=["title", "description", "tag_list"]) \
+                     .withColumn("follower_count", regexp_replace("follower_count", "k", "000")) \
+                     .withColumn("follower_count", regexp_replace("follower_count", "M", "000000")) \
+                     .withColumn("follower_count", regexp_replace("follower_count", "B", "000000000")) \
+                     .withColumn("follower_count", stream_df["follower_count"].cast(types.IntegerType())) \
+                     .withColumn("save_location", regexp_replace(col("save_location"), "Local save in ", "")) \
+                     .withColumn("is_image_or_video", regexp_replace(col("is_image_or_video"), "(story page format)", "")) \
+                     .withColumn("downloaded", stream_df["downloaded"].cast(types.BooleanType()))
 
 stream_df = stream_df.select(["unique_id",
                               "title",

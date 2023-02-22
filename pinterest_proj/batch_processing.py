@@ -38,9 +38,11 @@ class SparkBatchController():
 
     def read_from_s3(self, date =(datetime.now()-timedelta(days = 1))):
         '''
-        Function atakes in a date time and scrapes the data from that day,
-        if no date is given it takes the current date and scrapes the previous day
-        The path a constant taken from the env file and the date given is used to complete the S3 cluster path
+        Scrapes the given date, yesterday by default and returns the contents of the bucket.
+
+        params: date = datetime
+
+        returns: list of json objects or none if empty
         '''
         # Read from the S3 bucket
         
@@ -48,10 +50,8 @@ class SparkBatchController():
 
     def clean_data(self, df:DataFrame):
         '''
-        firstly a dict of values per row that need to be cleaned is set,
-        the duplicates and NA values are dropped from the selected data
-        follower_count suffix repleced with relevant number of 0's
-        the dict is userd to clean the other balues
+        Cleans data, drops duplicates and NA values. Follower count
+        is converted to an int and to_null lists other valuues to be cleaned
         '''
 
         to_null =  {"title" : "No Title Data Available",
@@ -61,28 +61,19 @@ class SparkBatchController():
                     "image_src" : "Image src error."
                     }
 
-        #drop na and duplicate rows
-        df = df.dropDuplicates(subset=["unique_id", "title", "description", "tag_list"]) \
-            .dropna(thresh=2, subset=["title", "description", "tag_list"])
-
-        #convert follower count from suffixed string to integer
-        df= df.withColumn("follower_count", regexp_replace("follower_count", "k", "000")) \
-              .withColumn("follower_count", regexp_replace("follower_count", "M", "000000")) \
-              .withColumn("follower_count", regexp_replace("follower_count", "B", "000000000"))
-
-        #cast follower type to int
-        df = df.withColumn("follower_count", df["follower_count"].cast(types.IntegerType()))
-
         # Replace all values in df that match the to_null dict values
         for key, value in to_null.items():
             df = df.withColumn(key, self.null_if_not_match(col(key), value))
 
-        #clean save locations string    
-        df = df.withColumn("save_location", regexp_replace(col("save_location"), "Local save in", ""))
-
-
-        #cast downloaded to bool
-        df = df.withColumn("downloaded", df["downloaded"].cast(types.BooleanType()))
+        #drop na and duplicate rows
+        df = df.dropDuplicates(subset=["unique_id", "title", "description", "tag_list"]) \
+            .dropna(thresh=2, subset=["title", "description", "tag_list"]) \
+            .withColumn("follower_count", regexp_replace("follower_count", "k", "000")) \
+            .withColumn("follower_count", regexp_replace("follower_count", "M", "000000")) \
+            .withColumn("follower_count", regexp_replace("follower_count", "B", "000000000")) \
+            .withColumn("follower_count", df["follower_count"].cast(types.IntegerType())) \
+            .withColumn("save_location", regexp_replace(col("save_location"), "Local save in", "")) \
+            .withColumn("downloaded", df["downloaded"].cast(types.BooleanType()))
 
         df = df.select(["unique_id",
                         "title",
